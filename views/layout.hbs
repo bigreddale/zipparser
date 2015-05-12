@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+  <head>
+		<script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+		<script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+		<script type="text/javascript" src="http://canvasjs.com//assets/script/canvasjs.min.js"></script>
+		<script src="http://maps.google.com/maps/api/js?sensor=false"></script>
+		<script>
+		
+			function drawBetterMap(AkLatLong, BillLatLong) {
+			
+				var locations = [
+					["Akamai Location", AkLatLong.split(',')[0], AkLatLong.split(',')[1]],
+					["Billing Location", BillLatLong.split(',')[0], BillLatLong.split(',')[1]]
+				];
+				
+		    // Setup the different icons and shadows
+		    var iconURLPrefix = 'http://maps.google.com/mapfiles/ms/icons/';
+		    
+		    var icons = [
+		      iconURLPrefix + 'red-dot.png',
+		      iconURLPrefix + 'blue-dot.png',
+		    ]
+		    var iconsLength = icons.length;
+		
+		    var map = new google.maps.Map(document.getElementById('map'), {
+		      zoom: 10,
+		      center: new google.maps.LatLng(-37.92, 151.25),
+		      mapTypeId: google.maps.MapTypeId.ROADMAP,
+		      mapTypeControl: false,
+		      streetViewControl: false,
+		      panControl: false,
+		      zoomControlOptions: {
+		         position: google.maps.ControlPosition.LEFT_BOTTOM
+		      }
+		    });
+		
+		    var infowindow = new google.maps.InfoWindow({
+		      maxWidth: 160
+		    });
+		
+		    var markers = new Array();
+		    
+		    var iconCounter = 0;
+		    
+		    // Add the markers and infowindows to the map
+		    for (var i = 0; i < locations.length; i++) {  
+		      var marker = new google.maps.Marker({
+		        position: new google.maps.LatLng(locations[i][1], locations[i][2]),
+		        map: map,
+		        icon: icons[iconCounter]
+		      });
+		
+		      markers.push(marker);
+		
+		      google.maps.event.addListener(marker, 'click', (function(marker, i) {
+		        return function() {
+		          infowindow.setContent(locations[i][0]);
+		          infowindow.open(map, marker);
+		        }
+		      })(marker, i));
+		      
+		      iconCounter++;
+		      // We only have a limited number of possible icon colors, so we may have to restart the counter
+		      if(iconCounter >= iconsLength) {
+		      	iconCounter = 0;
+		      }
+		    }
+		
+		    function autoCenter() {
+		      //  Create a new viewpoint bound
+		      var bounds = new google.maps.LatLngBounds();
+		      //  Go through each...
+		      for (var i = 0; i < markers.length; i++) {  
+						bounds.extend(markers[i].position);
+		      }
+		      //  Fit these bounds to the map
+		      map.fitBounds(bounds);
+		    }
+		    autoCenter();			
+			}
+			
+			
+			var chart;
+		  var socket = io();
+		  var username;
+		  $(document).ready(function(){
+		  	$("#columnNum").on('keyup', function() {
+		  		socket.emit('column update', $("#columnNum").val());
+		  	});
+			  socket.on('graph update', function(msg){
+			    console.log(msg);
+					chart = new CanvasJS.Chart("chartContainer",
+						{
+							title:{
+								text: "Distances between Akamai Lat/Long and Billing Zipcode center",
+								fontFamily: "arial black"
+							},
+					                animationEnabled: true,
+							legend: {
+								verticalAlign: "bottom",
+								horizontalAlign: "center"
+							},
+							theme: "theme1",
+							data: [
+								{        
+									type: "pie",
+									indexLabelFontFamily: "Garamond",       
+									indexLabelFontSize: 20,
+									indexLabelFontWeight: "bold",
+									startAngle:0,
+									indexLabelFontColor: "MistyRose",       
+									indexLabelLineColor: "darkgrey", 
+									indexLabelPlacement: "inside", 
+									toolTipContent: "{name}: {y} users",
+									showInLegend: true,
+									indexLabel: "#percent%", 
+									dataPoints: msg,
+									click: function(e) {
+										console.log(e);
+										$('#dataContainer').html("<h3>"+chart.options.data[0].dataPoints[e.dataPointIndex].name+"</h3><p>Red = Akamai Location  |  Blue = Billing Zip center point</p>");
+										socket.emit('pie click', e.dataPointIndex);
+									}
+								}
+							]
+						});
+						chart.render();
+		 	 	});
+			  socket.on('init', function(msgArray){
+					console.log('init');
+			    socket.removeListener('init');
+			  });
+			  socket.on('data update', function(msgArray){
+					console.log(msgArray);
+					var outputTable = $('#dataContainer').html()+"<table>";
+					for (var itr=0; itr<msgArray.length; itr++) {
+						var data = msgArray[itr];
+						outputTable += "<tr><td><a href='javascript:drawBetterMap(\""+data[0]+"\",\""+data[2]+"\")'>"+data[0]+" / "+data[1]+" and "+data[2]+" / "+data[3]+"</a></td></tr>";
+					}
+					outputTable += "</table>";
+					$('#dataContainer').html(outputTable);
+			  });
+		  });
+		  
+		  
+		  
+		</script>
+    <title>{{title}}</title>
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    {{{body}}}
+		<div id="chartContainer" style="height: 300px; width: 100%;"></div>
+		<div id="dataContainer" style="width: 450px; float:left"></div>
+		<div id="map" style="width: 550px; height: 550px; float:left"></div>
+  </body>
+</html>
