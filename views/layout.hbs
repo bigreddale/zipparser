@@ -6,9 +6,34 @@
 		<script type="text/javascript" src="http://canvasjs.com//assets/script/canvasjs.min.js"></script>
 		<script src="http://maps.google.com/maps/api/js?sensor=false"></script>
 		<script>
+				function pad(num, size) {
+				  var s = num+"";
+				  while (s.length < size) s = "0" + s;
+				  return s;
+				}
+				var stateList = new Array("AK","AL","AR","AZ","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID", "IL","IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE","NH","NJ","NM","NV","NY", "OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VA","VT","WA","WI","WV","WY");
+				var oneThird = Math.ceil(stateList.length / 27);
+				var colorList = [];
+				
+				for(itr = 0; itr <= oneThird; itr++) {
+				
+				  for(itr2 = 0; itr2 <= oneThird; itr2++) {
+				
+				    for(itr3 = 0; itr3 <= oneThird; itr3++) {
+				      var perItr = Math.ceil(240 / oneThird);
+				      
+				      var color = "#" + pad((itr * perItr).toString(16),2) + pad((itr2 * perItr).toString(16),2) + pad((itr3 * perItr).toString(16),2);
+				
+				      colorList.push(color);
+				    }
+				  }
+				};
+				console.log(colorList);
+				CanvasJS.addColorSet("states", colorList);
 		
 			function drawBetterMap(AkLatLong, BillLatLong) {
-			
+				
+							
 				var locations = [
 					["Akamai Location", AkLatLong.split(',')[0], AkLatLong.split(',')[1]],
 					["Billing Location", BillLatLong.split(',')[0], BillLatLong.split(',')[1]]
@@ -81,7 +106,7 @@
 			}
 			
 			
-			var chart;
+			var chart, aspline, bspline;
 		  var socket = io();
 		  var username;
 		  $(document).ready(function(){
@@ -96,7 +121,7 @@
 								text: "Distances between Akamai Lat/Long and Billing Zipcode center",
 								fontFamily: "arial black"
 							},
-					                animationEnabled: true,
+					                animationEnabled: false,
 							legend: {
 								verticalAlign: "bottom",
 								horizontalAlign: "center"
@@ -125,6 +150,91 @@
 							]
 						});
 						chart.render();
+						var userCount = 0;
+						for(itr = 0; itr < msg.length; itr++) {
+						  userCount += msg[itr].y;
+						}
+						$("#chartContainer").append("<h2>"+userCount+" users recorded</h2>");
+		 	 	});
+			  socket.on('histo update', function(msg){
+			    console.log(msg);
+					chart = new CanvasJS.Chart("histoContainer",
+			    {
+			      title:{
+			        text: "Zip Distances"    
+			      },
+			      animationEnabled: true,
+			      axisY: {
+			        title: "Number of Orders"
+			      },
+			      legend: {
+			        verticalAlign: "bottom",
+			        horizontalAlign: "center"
+			      },
+			      theme: "theme2",
+			      data: [
+			
+			      {        
+			        type: "column",  
+			        showInLegend: true, 
+			        legendMarkerColor: "grey",
+			        legendText: "Distance between Akamai Lat/Lng and Billing Zip Center Pt.",
+			        dataPoints: msg
+			      }   
+			      ]
+			    });
+			
+			    chart.render();
+		 	 	});
+			  socket.on('bspline update', function(msg){
+			    console.log(msg);
+					bspline = new CanvasJS.Chart("bsplineContainer",
+					{
+							colorSet: "states",
+						animationEnabled: true,
+						title:{
+							text: "Multi Series Spline Chart - Billing Zip Distributions"
+						},
+						data: msg,
+						legend: {
+							cursor: "pointer",
+							itemclick: function (e) {
+								if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+									e.dataSeries.visible = false;
+								} else {
+									e.dataSeries.visible = true;
+							}
+							bspline.render();
+							}
+						}
+					});
+				
+					bspline.render();
+		 	 	});
+			  socket.on('aspline update', function(msg3){
+			    console.log(msg3);
+					aspline = new CanvasJS.Chart("asplineContainer",
+					{
+							colorSet: "states",
+						animationEnabled: true,
+						title:{
+							text: "Multi Series Spline Chart - Akamai Zip Distributions"
+						},
+						data: msg3,
+						legend: {
+							cursor: "pointer",
+							itemclick: function (e) {
+								if (typeof(e.dataSeries.visible) === "undefined" || e.dataSeries.visible) {
+									e.dataSeries.visible = false;
+								} else {
+									e.dataSeries.visible = true;
+							}
+							aspline.render();
+							}
+						}
+					});
+				
+					aspline.render();
 		 	 	});
 			  socket.on('init', function(msgArray){
 					console.log('init');
@@ -135,7 +245,7 @@
 					var outputTable = $('#dataContainer').html()+"<table>";
 					for (var itr=0; itr<msgArray.length; itr++) {
 						var data = msgArray[itr];
-						outputTable += "<tr><td><a href='javascript:drawBetterMap(\""+data[0]+"\",\""+data[2]+"\")'>"+data[0]+" / "+data[1]+" and "+data[2]+" / "+data[3]+"</a></td></tr>";
+						outputTable += "<tr><td>"+parseInt(data[4])+" miles</td><td><a href='javascript:drawBetterMap(\""+data[0]+"\",\""+data[2]+"\")'>"+data[0]+" / "+data[1]+" and "+data[2]+" / "+data[3]+"</a></td></tr>";
 					}
 					outputTable += "</table>";
 					$('#dataContainer').html(outputTable);
@@ -153,5 +263,8 @@
 		<div id="chartContainer" style="height: 300px; width: 100%;"></div>
 		<div id="dataContainer" style="width: 450px; float:left"></div>
 		<div id="map" style="width: 550px; height: 550px; float:left"></div>
+		<div id="histoContainer" style="height: 300px; width: 100%; clear:both;"></div>
+		<div id="bsplineContainer" style="height: 300px; width: 100%; clear:both;"></div>
+		<div id="asplineContainer" style="height: 300px; width: 100%; clear:both;"></div>
   </body>
 </html>

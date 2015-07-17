@@ -11,3 +11,16 @@ a {
 	display:none;
 	
 }
+.canvasjs-chart-container {
+	top: 30px;
+	
+}
+#chartContainer h2 {
+	text-align: center;
+	
+}
+
+#dataContainer, #map {
+	margin-top: 40px;
+	
+}

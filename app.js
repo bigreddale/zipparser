@@ -16,9 +16,6 @@ var dataSet = require('./latlong.json');
 
 console.log(dataSet[94117]);
 
-
-
-
 var app = express();
 
 var http = require('http').Server(app);
@@ -76,13 +73,13 @@ var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
 var d = R * c;
 
-console.log("User's Akamai Data ("+akZip+" | "+AkLat+"/"+AkLong+") is "+d+" miles away from their Billing Zip: "+billZip);
+//console.log("User's Akamai Data ("+akZip+" | "+AkLat+"/"+AkLong+") is "+d+" miles away from their Billing Zip: "+billZip);
 return d;
 }
 
 
 
-
+//Setup Pie Chart
 var output = [
     {y: 0, name:"exact zipcode match",legendMarkerType: "square"},
     {y: 0, name:"less than 10 miles",legendMarkerType: "square"},
@@ -90,49 +87,136 @@ var output = [
     {y: 0, name:"less than 100 miles",legendMarkerType: "square"},
     {y: 0, name:"100 miles or greater",legendMarkerType: "square"}
 ];
-var columnNumber = 1;
+
+//Set Histogram Object
+var histogram = [
+                 {y: 0, label:"zip match",legendMarkerType: "square"}
+];
+
+for (itr = 20; itr <= 400; itr+=20) {
+  histogram.push({y: 0, label:"< " + itr + " m",legendMarkerType: "square"});
+}
+histogram.push({y: 0, label:"> 3000 m",legendMarkerType: "square"});
+
+var stateList = new Array("AK","AL","AR","AZ","CA","CO","CT","DC","DE","FL","GA","HI","IA","ID", "IL","IN","KS","KY","LA","MA","MD","ME","MI","MN","MO","MS","MT","NC","ND","NE","NH","NJ","NM","NV","NY", "OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VA","VT","WA","WI","WV","WY");
+
+
+//Set Billing Zip Spline
+var bspline = [
+               
+];
+
+for (itr = 0; itr < stateList.length; itr++) {
+  var data = {
+      type: "spline",
+      name: stateList[itr],
+      showInLegend: true,        
+      dataPoints: [
+      ]
+    }              
+  for (itr2 = 0; itr2 <= 400; itr2+=20) {                   
+    data.dataPoints.push({x:itr2, y:0});
+  } 
+  
+  bspline.push(data); 
+}
+
+//Set Akamai Zip Spline 
+var aspline = [
+               
+];
+
+for (itr = 0; itr < stateList.length; itr++) {
+  var data = {
+      type: "spline",
+      name: stateList[itr],
+      showInLegend: true,        
+      dataPoints: [
+      ]
+    }              
+  for (itr2 = 0; itr2 <= 400; itr2+=20) {                   
+    data.dataPoints.push({x:itr2, y:0});
+  } 
+  
+  aspline.push(data); 
+}
+var columnNumber = 0;
 var parsedDataSets = [[],[],[],[],[]];
 var lastPieClick = null;
 
 function parseData(record) {
-  var data = record[columnNumber],
-      dataSplit = data.split('|'),
-      billZip = dataSplit[0],
-      akZip = dataSplit[1],
-      akLat = parseFloat(dataSplit[2]),
-      akLng = parseFloat(dataSplit[3]),
-      billLat = parseFloat(dataSet[billZip][1]),
-      billLng = parseFloat(dataSet[billZip][2]);
-  
-  if(billZip == akZip) {
-    output[0].y += 1;
-    parsedDataSets[0].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0]]);
-  } else {
-    var miles = getDistance(akZip, billZip, akLat, akLng);
-    switch (true) {
-    case (miles < 10):
-      output[1].y += 1;
-      parsedDataSets[1].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0]]);
-      break;
-    case (miles >= 10 && miles < 50):
-      output[2].y += 1;
-      parsedDataSets[2].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0]]);
-      break;
-    case (miles >= 50 &&miles < 100):
-      output[3].y += 1;
-    parsedDataSets[3].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0]]);
-      break;
-    case (miles >= 100):
-      output[4].y += 1;
-      parsedDataSets[4].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0]]);
-      break;
+  console.log("Data: " + record[columnNumber]);
+  try {
+    var data = record[columnNumber],
+        dataSplit = data.split('|'),
+        billZip = parseInt(dataSplit[0]),
+        akZip = parseInt(dataSplit[1]),
+        akLat = parseFloat(dataSplit[2]),
+        akLng = parseFloat(dataSplit[3]),
+        billLat = parseFloat(dataSet[billZip][1]),
+        billLng = parseFloat(dataSet[billZip][2]),
+        repeats = record[columnNumber+1];
+    for(rep = 0; rep < repeats; rep++) {
+      if(billZip == akZip) {
+        output[0].y += 1;
+        histogram[0].y += 1;
+        if(rep ==0) parsedDataSets[0].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0],0]);
+      } else {
+        var miles = getDistance(akZip, billZip, akLat, akLng);
+        console.log("Miles: " + miles);
+        switch (true) {
+        case (miles < 10):
+          output[1].y += 1;
+        if(rep ==0) parsedDataSets[1].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0], miles]);
+          break;
+        case (miles >= 10 && miles < 50):
+          output[2].y += 1;
+        if(rep ==0) parsedDataSets[2].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0], miles]);
+          break;
+        case (miles >= 50 &&miles < 100):
+          output[3].y += 1;
+        if(rep ==0) parsedDataSets[3].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0], miles]);
+          break;
+        case (miles >= 100):
+          output[4].y += 1;
+        if(rep ==0)  parsedDataSets[4].push([akLat+','+akLng, dataSet[akZip][0], billLat + "," +billLng, dataSet[billZip][0], miles]);
+          break;
+        }
+        
+        var whichHisto = Math.ceil(miles / 20);
+        console.log("whichhisto: " + whichHisto);
+        if(whichHisto > 20) {
+          histogram[21].y += 1;      
+        } else {
+          histogram[whichHisto].y += 1;
+        }
+        
+        var bpos = stateList.indexOf(dataSet[billZip][0]);
+        var apos = stateList.indexOf(dataSet[akZip][0]);
+        if(whichHisto > 20) {
+          whichHisto = 20;
+        }
+        console.log('1');
+        bspline[bpos].dataPoints[whichHisto].y += 1;
+        console.log('2');
+        //console.log(bpos + " | " + dataSet[billZip][0] + " | " + whichHisto);
+        aspline[apos].dataPoints[whichHisto].y += 1;
+        console.log('3');
+        //console.log(apos + " | " + dataSet[akZip][0] + " | " + whichHisto);
+        
+      }
     }
-    
+    if(recorditr % 1000 === 0) {
+    console.log(parsedDataSets);
+    io.emit('graph update', output);
+    io.emit('histo update', histogram);
+    io.emit('aspline update', aspline);
+    io.emit('bspline update', bspline);
+    }
+    //console.log(billZip);
+  } catch(e) {
+    console.log("Error: " + e);
   }
-  console.log(parsedDataSets);
-  io.emit('graph update', output);
-  
-  console.log(billZip);
 }
 
 
@@ -141,12 +225,13 @@ function parseData(record) {
 //Create the parser
 var parser = parse({delimiter: ','});
 //Use the writable stream api
+var recorditr = 0;
 parser.on('readable', function(){
-  var itr = 0;
   while(record = parser.read()){
-    console.log("Itr: " + (itr++));
+    console.log("Itr: " + (recorditr++));
     parseData(record);
   }
+  
 });
 
 //Catch any error
@@ -154,6 +239,15 @@ parser.on('error', function(err){
   console.log(err.message);
 });
 
+parser.on('end', function() {
+  io.emit('graph update', output);
+  io.emit('histo update', histogram);
+  io.emit('aspline update', aspline);
+  io.emit('bspline update', bspline);
+
+  console.log(aspline);
+  
+});
 
 
 
@@ -212,6 +306,9 @@ io.on('connection', function(socket){
   io.emit('init', 'foo');
   io.emit('graph update', 'apple');
   io.emit('graph update', output);
+  io.emit('histo update', histogram);
+  io.emit('aspline update', aspline);
+  io.emit('bspline update', bspline);
   socket.on('column update', function(val){
     columnNumber = val;
     console.log('Column Set To: ' + val);
